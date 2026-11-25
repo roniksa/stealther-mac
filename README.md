@@ -21,7 +21,7 @@ You need macOS 12 or later and Apple's Command Line Tools, which include Swift a
 1. Download **Source code (zip)** from the [latest release](https://github.com/roniksa/stealther-mac/releases/latest) and unzip it.
 2. In Terminal, go to the unzipped folder and start it:
    ```
-   cd ~/Downloads/stealther-mac-1.0.0
+   cd ~/Downloads/stealther-mac-1.0.1
    ./run.sh
    ```
    The first run builds `build/StealtherScanner.app` on your Mac, starts the local server and opens http://127.0.0.1:8765. Press Ctrl-C in Terminal to stop.
@@ -113,3 +113,7 @@ The **Map** view shows the devices on an OpenStreetMap or Esri satellite base ma
 - `POST /api/fix/<id>`: change a spot, `{lat, lon, t0, t1}`, or send `{stop: true}` or `{delete: true}`.
 
 Server options: `--gap`, `--retention-days` (how long raw RSSI samples are kept, default 30), `--port`, `--db`, `--lan` (also accept the iPhone app on the local network; prints a token), `--lan-token`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
