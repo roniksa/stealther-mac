@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stealther Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/><circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".7"/><path d="M12 12 L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+    <div><b>Stealther</b><span>Wi-Fi + Bluetooth tracker</span></div>
+  </div>
+  <div class="pills" id="pills"></div>
+  <div class="hcontrols">
+    <label class="field">Environment
+      <select id="env"></select>
+    </label>
+    <label class="field" id="customNWrap" hidden>n = <output id="customNOut"></output>
+      <input type="range" id="customN" min="1.6" max="5" step="0.1">
+    </label>
+    <div class="seg" id="view" role="group" aria-label="View">
+      <button data-v="split">Split</button><button data-v="radar">Radar</button><button data-v="list">List</button><button data-v="map">Map</button>
+    </div>
+    <button class="btn" id="calibBtn" title="Reference signal levels">Calibration</button>
+  </div>
+</header>
+
+<div id="banners"></div>
+
+<main id="main" class="split">
+  <section class="pane" id="radarPane">
+    <div class="toolbar">
+      <label class="field">Range
+        <select id="range">
+          <option value="auto">Auto</option><option value="3">3 m</option><option value="5">5 m</option>
+          <option value="10">10 m</option><option value="20">20 m</option><option value="50">50 m</option>
+          <option value="100">100 m</option><option value="200">200 m</option>
+        </select>
+      </label>
+      <label class="field">Scale
+        <select id="scale"><option value="log">Log</option><option value="linear">Linear</option></select>
+      </label>
+      <label class="chk"><input type="checkbox" id="showBle"> <i class="dot ble"></i>Bluetooth</label>
+      <label class="chk"><input type="checkbox" id="showWifi"> <i class="dot wifi"></i>Wi-Fi</label>
+      <label class="chk"><input type="checkbox" id="showUnc"> Uncertainty</label>
+      <label class="chk"><input type="checkbox" id="showFading"> Recently gone</label>
+    </div>
+    <div class="radarWrap" id="radarWrap">
+      <canvas id="radar"></canvas>
+      <div class="zoomCtl" role="group" aria-label="Radar zoom">
+        <button class="btn icon" id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">+</button>
+        <button class="btn icon" id="zoomOut" title="Zoom out (−)" aria-label="Zoom out">−</button>
+        <button class="btn icon" id="zoomFocus" title="Zoom to selected device (F)" aria-label="Zoom to selected device">◎</button>
+        <button class="btn icon" id="zoomReset" title="Reset zoom (0)" aria-label="Reset zoom">⟲</button>
+        <output id="zoomLevel" aria-live="polite">1.0×</output>
+      </div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <p class="note" id="radarNote"></p>
+  </section>
+
+  <section class="pane" id="listPane">
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search name, ID, vendor, tag…" aria-label="Search">
+      <div class="seg" id="kind" role="group" aria-label="Type">
+        <button data-v="all">All</button><button data-v="ble">Bluetooth</button><button data-v="wifi">Wi-Fi</button>
+      </div>
+      <select id="state" aria-label="Which devices">
+        <option value="active">Active now</option>
+        <option value="present">Still around</option>
+        <option value="recent">Last 15 min</option>
+        <option value="all">All history</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="trackersOnly"> Trackers only</label>
+      <span class="count" id="count"></span>
+      <a class="btn ghost" href="/api/export.csv" download="stealther-devices.csv">Export CSV</a>
+    </div>
+    <div class="tableWrap">
+      <table id="tbl">
+        <thead><tr>
+          <th data-k="watched" class="c-star" title="Watched">★</th>
+          <th data-k="name">Device</th>
+          <th data-k="dtype" class="c-type">Type</th>
+          <th data-k="rssi" class="num">Signal</th>
+          <th data-k="dist" class="num">Distance</th>
+          <th data-k="here" class="num" title="Current continuous presence">Here for</th>
+          <th data-k="total" class="num" title="Total time seen, all sessions">Total seen</th>
+          <th data-k="first" class="num c-first">First seen</th>
+          <th data-k="last" class="num">Last seen</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+  </section>
+
+  <section class="pane" id="mapPane">
+    <div class="toolbar">
+      <button class="btn primary" id="hereBtn" title="Then click where you are standing">📍 I’m here</button>
+      <label class="field">Record for
+        <select id="dwell">
+          <option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option>
+          <option value="600">10 min</option><option value="0">until I stop</option>
+        </select>
+      </label>
+      <button class="btn ghost" id="pastBtn" title="Then click where you were">Add past visit</button>
+      <div class="seg" id="mapBase" role="group" aria-label="Base map">
+        <button data-v="osm">Map</button><button data-v="sat">Satellite</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="geoWifi"> <i class="dot wifi"></i>Wi-Fi</label>
+      <label class="chk"><input type="checkbox" id="geoBle"> <i class="dot ble"></i>Bluetooth</label>
+      <form class="mapSearch" id="mapSearch">
+        <input type="search" id="mapQ" placeholder="Find an address (OpenStreetMap)" aria-label="Find an address">
+        <button class="btn icon" type="button" id="locateBtn" title="Find my location: drops a pin you can adjust" aria-label="Find my location">◎</button>
+      </form>
+    </div>
+    <div class="recBar" id="recBar" hidden></div>
+    <div class="recBar candBar" id="candBar" hidden>
+      <span id="candText"></span>
+      <span class="candActs"><button class="btn ghost" id="candCancel">Cancel</button><button class="btn primary" id="candOk">Confirm &amp; record</button></span>
+    </div>
+    <div class="mapWrap"><div id="map"></div><div class="mapMsg" id="mapMsg" hidden></div></div>
+    <p class="note" id="mapNote"></p>
+  </section>
+
+  <section class="pane" id="geoSide">
+    <div class="sideHead"><h3>Your spots</h3><span class="count" id="fixCount"></span></div>
+    <div class="pastForm" id="pastForm" hidden>
+      <p class="hint">Past visit at the marked point. The scanner must have been running with you there.</p>
+      <label>From <input type="datetime-local" id="pastFrom" step="60"></label>
+      <label>To <input type="datetime-local" id="pastTo" step="60"></label>
+      <div class="row end"><button class="btn ghost" id="pastCancel">Cancel</button><button class="btn primary" id="pastSave">Save visit</button></div>
+    </div>
+    <ol class="fixList" id="fixList"></ol>
+    <div class="geoCard" id="geoCard" hidden></div>
+    <div class="sideHead"><h3>Located devices</h3><span class="count" id="geoCount"></span></div>
+    <input type="search" id="geoQ" placeholder="Filter name, BSSID…" aria-label="Filter located devices">
+    <div class="geoList" id="geoList"></div>
+  </section>
+</main>
+
+<aside class="drawer" id="drawer" hidden aria-label="Device details">
+  <div class="dhead">
+    <div>
+      <div class="dkind" id="dKind"></div>
+      <h2 id="dName"></h2>
+      <code id="dId"></code>
+    </div>
+    <button class="btn icon" id="dClose" aria-label="Close">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="stats" id="dStats"></div>
+    <div class="tags" id="dTags"></div>
+    <h3>Signal, last 30 min</h3>
+    <canvas id="dChart" height="150"></canvas>
+    <h3>Distance calibration</h3>
+    <p class="hint" id="dRef"></p>
+    <div class="row">
+      <button class="btn" id="dCal">Device is 1 m away now</button>
+      <button class="btn ghost" id="dCalReset">Reset</button>
+    </div>
+    <h3>Your notes</h3>
+    <div class="row">
+      <input type="text" id="dLabel" maxlength="80" placeholder="Label, e.g. “Neighbour’s TV”">
+      <button class="btn" id="dWatch"></button>
+    </div>
+    <h3>Details</h3>
+    <dl class="kv" id="dMeta"></dl>
+    <h3>Presence sessions</h3>
+    <table class="mini" id="dSessions"><thead><tr><th>Started</th><th class="num">Duration</th><th class="num">Strongest</th></tr></thead><tbody></tbody></table>
+  </div>
+</aside>
+
+<dialog id="calib">
+  <form method="dialog">
+    <h2>Calibration</h2>
+    <p class="hint">Distance uses the log-distance path-loss model:
+      <code>d = 10<sup>(P<sub>1m</sub> − RSSI) / (10·n)</sup></code>.
+      P<sub>1m</sub> is the signal you would see 1 m from the device; <i>n</i> comes from the environment mode.
+      For the most accurate result on one device, open it and press “Device is 1 m away now”.</p>
+    <div class="grid2">
+      <label>Bluetooth P<sub>1m</sub> (no Tx power advertised)<input type="number" id="bleRef" step="1"> dBm</label>
+      <label>Bluetooth offset from advertised Tx power<input type="number" id="bleTxOffset" step="1"> dB</label>
+      <label>Wi-Fi 2.4 GHz P<sub>1m</sub><input type="number" id="wifi24" step="1"> dBm</label>
+      <label>Wi-Fi 5 GHz P<sub>1m</sub><input type="number" id="wifi5" step="1"> dBm</label>
+      <label>Wi-Fi 6 GHz P<sub>1m</sub><input type="number" id="wifi6" step="1"> dBm</label>
+      <label>Signal noise σ (uncertainty band)<input type="number" id="sigma" step="0.5" min="0"> dB</label>
+    </div>
+    <div class="row end">
+      <button class="btn ghost" value="reset" id="calibReset">Restore defaults</button>
+      <button class="btn primary" value="ok">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js"></script>
+<script src="geo.js"></script>
+</body>
+</html>
